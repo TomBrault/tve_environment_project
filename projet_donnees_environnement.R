@@ -1,13 +1,18 @@
 #------------------------------------------
-# Projet de théorie des valeurs extrêmes
-# Données environnementales
+# Extreme Values Theory - Project
+# Environment data
 #------------------------------------------
 
-# On utilisera ici des "blended data" (données corrigées)
+### List of authors
+# DE CAMPIGNEULLES Charles
+# GUERAUD Benjamin
+# BRAULT Tom
+
+# We used "blended data" here (corrected data)
 
 rm(list = ls())
 
-### Packages à utiliser
+### Packages to use
 
 library(dplyr)
 library(tidyr)
@@ -17,14 +22,15 @@ library(tseries) # for adf.test
 library(lubridate)  # For date manipulation
 library(evd) # for GPD choice of threshold
 
-# Environnement (à remplacer par votre dossier d'étude)
+# Environment (to replace with your folder)
 setwd("/home/id2244/3A/theorie_valeurs_extremes/projet_donnees_environnement")
+# Alternative solution: open a project (.Rproj) and save it in the same folder 
 
 #------------------------------------------
-### Importation des jeux de données
+### Importation of datasets
 #------------------------------------------
 
-### Importation du jeu de données de précipitation
+### Importation of precipitation dataset
 
 precipitation = read.table("precipitation_data.txt", 
                             header = TRUE, 
@@ -39,7 +45,7 @@ colnames(precipitation) = c("date", "precipitation_amount","fiability_precipitat
 precipitation[precipitation$fiability_precipitation_amount == 0,]$precipitation_amount = precipitation[precipitation$fiability_precipitation_amount == 0,]$precipitation_amount / 10
 
 #------------------------------------------
-### Importation du jeu de données de couverture nuageuse (cloud cover)
+### Importation of cloud cover dataset
 
 cloud_cover = read.table("cloud_cover_data.txt", 
                            header = TRUE, 
@@ -51,7 +57,7 @@ cloud_cover = cloud_cover[,2:4]
 colnames(cloud_cover) = c("date", "cloud_cover", "fiability_cloud_cover")
 
 #------------------------------------------
-### Importation du jeu de données d'humidité
+### Importation of humidity dataset
 
 humidity = read.table("humidity_data.txt", 
                       header = TRUE, 
