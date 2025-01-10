@@ -11,16 +11,13 @@ rm(list = ls())
 
 library(dplyr)
 library(tidyr)
-library(forcats)
-library(FactoMineR)
 library(ggplot2)
-library(factoextra)
-library(class)
 library(tibble) # allows to put columns in row headers
 library(tseries) # for adf.test
 library(lubridate)  # For date manipulation
+library(evd) # for GPD choice of threshold
 
-# Environnement
+# Environnement (à remplacer par votre dossier d'étude)
 setwd("/home/id2244/3A/theorie_valeurs_extremes/projet_donnees_environnement")
 
 #------------------------------------------
@@ -239,13 +236,21 @@ plot(precipitation_ts, col = "darkblue", ylab = "Precipitation amount (mm)",
 
 ## Analysis of stationarity
 par(mfrow=c(1,2))
-acf(precipitation_ts)
-pacf(precipitation_ts)
+acf(precipitation_ts, main = "ACF de la série de précipitation")
+pacf(precipitation_ts, main = "PACF de la série de précipitation")
 dev.off()
 
+
+# Augmented Dickey-Fuller test
 adf.test(precipitation_ts) # Low p-value: 0.01 (we reject H0 with confidence level 95%)
-# Recall: H0 corresponds to the existence of a unit root, i.e., the series is not stationary
+# Recall: H0 corresponds to the existence of a unit root, i.e., to the non-stationarity case
 # So, we can assume that the initial time series is already stationary
+
+# Kwiatkowski-Phillips-Schmidt-Shin (KPSS) test
+kpss.test(precipitation_ts) # High p-value: 0.1 (we do not reject H0 with confidence level 95%)
+# Recall: H0 corresponds to the stationarity case
+# So, we can assume that the initial time series is already stationary
+
 
 ## Analysis of seasonality: does the precipitation amount depend on the season?
 
@@ -276,6 +281,9 @@ mean(precipitation_ts[precipitation_ts >= 0])
 ### Analysis of the extreme values - Precipitation
 #------------------------------------------
 
+max(precipitation_ts)
+# maximum value of 262.6 mm recorded on 14 October 1957
+
 #------------------------------------------
 ## GEV analysis
 #------------------------------------------
@@ -283,3 +291,86 @@ mean(precipitation_ts[precipitation_ts >= 0])
 #------------------------------------------
 ## GPD analysis
 #------------------------------------------
+
+## Choice of the threshold
+
+# mrlplot: Empirical Mean Residual Life Plot
+par(mfrow = c(1,1))
+mrlplot(precipitation_ts, 
+        main = "",
+        xlab = "Threshold (mm)",
+        col = "darkblue")
+abline(v = 20, col="darkred")
+abline(v = 80, col = "darkred")
+# thresholds between 20 and 80 based on the graph
+
+# tcplot: Threshold Choice Plot
+par(mfrow = c(1,1))
+tcplot(precipitation_ts, tlim = c(10,100), which=1, xlab = "Threshold (mm)") # tlim: interval of thresholds
+grid()
+abline(v = 10, col="darkred")
+abline(v = 25, col = "darkred")
+# thresholds between 10 and 25 may be acceptable based on the graph
+
+par(mfrow = c(1,1))
+tcplot(precipitation_ts, tlim = c(10,100), which=2, xlab = "Threshold (mm)") # tlim: interval of thresholds
+grid()
+abline(v = 10, col="darkred")
+abline(v = 25, col = "darkred")
+# thresholds between 10 and 25 may be acceptable based on the graph
+
+# overall, best threshold values in [20,25]
+
+sum(precipitation_ts >= 25)
+sum(precipitation_ts >= 20)
+
+# choice of threshold: 25 mm
+
+## GPD fitting
+
+precipitation_gpd_fit = fpot(precipitation_ts, 25, npp = 365)
+
+par(mfrow = c(2,2))
+plot(precipitation_gpd_fit)
+
+par(mfrow = c(1,1))
+plot(precipitation_gpd_fit, which = 1) # Probability Plot
+plot(precipitation_gpd_fit, which = 2, ylim=c(0,400)) # Quantile-quantile plot
+plot(precipitation_gpd_fit, which = 4, ylim=c(0,400)) # Return Level Plot
+# both plots look acceptable
+
+# Number of exceedances with this threshold
+n_exceedances = sum(precipitation_ts > 25)
+n_exceedances
+# 351 exceedances in total
+
+# Parameters estimations and confidence interval
+precipitation_gpd_fit
+confint(precipitation_gpd_fit)
+# Both parameters seem significant as the value 0 does not lie in
+# any confidence interval.
+
+## Return periods and return levels
+
+inverse_function_gpd_shape0 = function(x,tau,xi){
+  return(tau * ((1-x)^(-xi) -1)/ xi)}
+
+return_level_gpd_shape0 = function(T,tau,xi){
+  u = 0.03
+  lambda = length(precipitation_gpd_fit$exceedances)/length(precipitation_ts) # proportion of threshold exceedances
+  return(u+inverse_function_gpd_shape0(1-1/(T*lambda),tau,xi))
+}
+# T: return period (days)
+max(precipitation_ts)
+# Return level for a return period of 2 years
+return_level_gpd_shape0(T = 2*365, tau = as.numeric(precipitation_gpd_fit$estimate["scale"]), 
+                        xi = as.numeric(precipitation_gpd_fit$estimate["shape"]))
+# Return level corresponding to a period of return of 20 years: 48.8mm
+# with the GEV, we found a return level of 172.9mm approximately
+
+# Return level for a return period of 10 years
+return_level_gpd_shape0(T = 10*365, tau = as.numeric(precipitation_gpd_fit$estimate["scale"]),
+                        xi = as.numeric(precipitation_gpd_fit$estimate["shape"]))
+# Return level corresponding to a period of return of 10 years: 118.2mm
+# with the GEV, we found a return level of 367mm approximately
+
