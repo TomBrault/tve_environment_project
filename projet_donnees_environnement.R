@@ -294,6 +294,81 @@ max(precipitation_ts)
 ## GEV analysis
 #------------------------------------------
 
+# Étape 1 : Filtrer les données (supprime NA et valeurs <= 0) -> plus nécessaire ici (déjà fait)
+precipitation_clean <- precipitation %>%
+  filter(!is.na(precipitation_amount) & precipitation_amount > 0)
+
+# Étape 2 : Groupement par année et saison
+# Convertir la variable `date` en année et utiliser `season`
+precipitation_clean <- precipitation_clean %>%
+  mutate(
+    year = as.numeric(format(date, "%Y"))  # Extraire l'année pour chaque date
+  )
+
+# Calcul des maxima par saison et année
+max_per_season <- precipitation_clean %>%
+  group_by(year, season) %>%
+  summarize(Max_precipitation = max(precipitation_amount, na.rm = TRUE), .groups = "drop")
+
+# Afficher un aperçu des maxima par saison
+head(max_per_season)
+
+# Étape 3 : Ajuster un modèle GEV aux maxima saisonniers
+fitted <- fgev(max_per_season$Max_precipitation, nsloc = NULL, prob = NULL, 
+               std.err = TRUE, corr = FALSE, method = "BFGS", warn.inf = TRUE)
+
+# Résumé des résultats
+summary(fitted)
+
+# Affichage des diagnostics du modèle
+par(mfrow = c(1, 1))
+plot(fitted)
+
+# Étape 4 : Estimation des paramètres du modèle ajusté
+fitted$estimate
+
+# Calcul des intervalles de confiance pour 'loc'
+IC_lower_loc <- fitted$estimate['loc'] - qnorm(0.975) * fitted$std.err['loc']
+IC_upper_loc <- fitted$estimate['loc'] + qnorm(0.975) * fitted$std.err['loc']
+IC_loc <- cbind(IC_lower_loc, IC_upper_loc)
+
+# Calcul des intervalles de confiance pour 'scale'
+IC_lower_scale <- fitted$estimate['scale'] - qnorm(0.975) * fitted$std.err['scale']
+IC_upper_scale <- fitted$estimate['scale'] + qnorm(0.975) * fitted$std.err['scale']
+IC_scale <- cbind(IC_lower_scale, IC_upper_scale)
+
+# Calcul des intervalles de confiance pour 'shape'
+IC_lower_shape <- fitted$estimate['shape'] - qnorm(0.975) * fitted$std.err['shape']
+IC_upper_shape <- fitted$estimate['shape'] + qnorm(0.975) * fitted$std.err['shape']
+IC_shape <- cbind(IC_lower_shape, IC_upper_shape)
+
+# Afficher les intervalles de confiance
+list(
+  loc = IC_loc,
+  scale = IC_scale,
+  shape = IC_shape
+)
+
+# Étape 5 : Tracer le profil de vraisemblance
+plot(profile(fitted))
+
+# Calculer les intervalles de confiance avec `confint()`
+confint(fitted)  # Basés sur la méthode par défaut
+confint(profile(fitted))  # Basés sur le profil de vraisemblance
+
+# Étape 6 : Calcul des niveaux de retour
+# Exemple pour une période de retour de 10 ans (par saison)
+rl(fitted)
+
+# Calcul manuel pour une période de retour spécifique (par exemple, 10 ans)
+period <- 10
+# Période de retour
+level_10_years <- qgev(1 - 1/(4 * period), 
+                       fitted$estimate["loc"], 
+                       fitted$estimate["scale"], 
+                       fitted$estimate["shape"])
+level_10_years
+
 #------------------------------------------
 ## GPD analysis
 #------------------------------------------
